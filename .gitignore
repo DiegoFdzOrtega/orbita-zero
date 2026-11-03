@@ -1,0 +1,5 @@
+node_modules/
+pruebas/node_modules/
+pruebas/resultados/
+.DS_Store
+Thumbs.db

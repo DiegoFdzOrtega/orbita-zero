@@ -1,0 +1,11 @@
+{
+  "name": "rosquilla-runner-pruebas",
+  "private": true,
+  "description": "Pruebas automáticas de Rosquilla Runner con Playwright",
+  "scripts": {
+    "test": "node prueba-juego.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}

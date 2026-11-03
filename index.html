@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: usa toda la pantalla también en móviles con muesca -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Nébula: shooter espacial para móvil hecho con DiegoFo Engine (motor propio) y diegofo-ui.">
+  <meta name="theme-color" content="#050816">
+  <!-- Se puede añadir a la pantalla de inicio como una app -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="iconos/icono-192.png">
+  <link rel="apple-touch-icon" href="iconos/icono-192.png">
+  <title>Nébula · DiegoFo Engine</title>
+
+  <style>
+    /* ---------- Tema de diegofo-ui (los componentes leen estas variables) ---------- */
+    :root {
+      --bg-card: #121838;
+      --bg-input: #1a2250;
+      --bg-navbar: #13b5d6;
+      --df-color-primary: #0fa3c2;     /* color principal de los botones */
+      --border-color: #2c3a7a;
+      --text-main: #eef3ff;
+      --text-muted: #a5b0dc;
+      --accent-teal: #3ddc97;
+      --accent-blue: #5ce1ff;
+      --accent-red: #ff5c8a;
+      --font-family: "Trebuchet MS", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+      --espacio: #050816;
+      --cian: #5ce1ff;
+      --rosa: #ff5ca8;
+    }
+
+    * { box-sizing: border-box; }
+    /* Los componentes con display propio también deben ocultarse con hidden */
+    [hidden] { display: none !important; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--espacio);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      overflow: hidden;
+      overscroll-behavior: none;     /* sin "tirar para recargar" en el móvil */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ---------- El juego ocupa toda la pantalla ---------- */
+    #juego {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ---------- Capas de interfaz encima del canvas ---------- */
+    .capa {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+               max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+    .capa[hidden] { display: none; }
+
+    /* Pantalla de carga */
+    #carga { background: var(--espacio); }
+    .caja-carga { width: min(320px, 100%); text-align: center; }
+
+    /* Menú principal */
+    #menu {
+      background: radial-gradient(ellipse at center, rgba(5, 8, 22, 0.35), rgba(5, 8, 22, 0.1) 70%);
+      overflow-y: auto;
+    }
+    .panel-menu {
+      width: min(420px, 100%);
+      padding: 22px 22px 16px;
+      background: rgba(18, 24, 56, 0.86);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      box-shadow: 0 0 0 1px rgba(92, 225, 255, 0.08), 0 20px 50px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(6px);
+      text-align: center;
+    }
+    .titulo {
+      margin: 0;
+      font-size: clamp(2.2rem, 10vw, 3rem);
+      line-height: 1;
+      letter-spacing: 6px;
+      color: #fff;
+      text-shadow: 0 0 12px rgba(92, 225, 255, 0.8), 0 0 32px rgba(255, 92, 168, 0.55);
+    }
+    .subtitulo { margin: 8px 0 16px; color: var(--text-muted); }
+    .botones-menu { display: grid; gap: 10px; margin-top: 14px; }
+    .fila-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .creditos { margin: 14px 0 0; font-size: 0.78rem; color: var(--text-muted); }
+
+    /* En móvil tumbado hay muy poca altura: menú en dos columnas */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .panel-menu {
+        width: min(640px, 100%);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 18px;
+        align-items: center;
+        padding: 14px 18px;
+      }
+      .subtitulo { margin-bottom: 8px; }
+      .botones-menu { margin-top: 0; }
+      .creditos { grid-column: 1 / -1; margin-top: 4px; }
+      .cabecera-piloto { margin-bottom: 8px; }
+      .subtitulo { display: none; }
+    }
+
+    /* Marcador (HUD) */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: grid;
+      gap: 6px;
+      padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+      pointer-events: none;           /* los toques llegan al juego... */
+    }
+    #hud[hidden] { display: none; }
+    #hud df-button { pointer-events: auto; } /* ...excepto el botón de pausa */
+    .fila-hud { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .marcadores { display: flex; gap: 6px; flex-wrap: wrap; }
+    .marcadores df-badge { font-variant-numeric: tabular-nums; }
+    #barraCasco { width: min(150px, 34vw); }
+    #barraJefe { width: min(420px, 100%); justify-self: center; }
+    #barraJefe[hidden] { display: none; }
+
+    /* Tarjetas del final de partida */
+    .tarjetas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    @media (max-width: 420px) { .tarjetas { grid-template-columns: 1fr; } }
+    .pie-modal { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+    .ajustes { display: grid; gap: 14px; }
+    .ayuda p, .ayuda li { line-height: 1.5; }
+    .ayuda ul { padding-left: 1.2em; margin: 0.4em 0; }
+    .ayuda a { color: var(--cian); }
+    kbd {
+      padding: 1px 6px;
+      border: 1px solid var(--border-color);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: var(--bg-input);
+      font-size: 0.9em;
+    }
+
+
+    /* ---------- Cabecera del piloto en el menú ---------- */
+    .cabecera-piloto {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: -4px 0 14px;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      text-align: left;
+    }
+    .cabecera-piloto .datos { flex: 1; min-width: 0; display: grid; }
+    .cabecera-piloto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cabecera-piloto span { font-size: 0.85rem; color: #ffd36b; }
+    .rejilla-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .boton-con-contador { position: relative; }
+    .boton-con-contador df-badge { margin-left: 4px; }
+
+    /* ---------- Listas de las pantallas (pilotos, hangar, logros) ---------- */
+    .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .lista > li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+    .piloto.activo { border-color: var(--accent-teal); }
+    .piloto-datos, .datos-hangar, .datos-logro { flex: 1; min-width: 0; display: grid; gap: 3px; }
+    .piloto-datos span, .datos-logro span, .datos-hangar span { font-size: 0.85rem; color: var(--text-muted); }
+    .datos-hangar .efecto { color: var(--text-main); }
+    .datos-hangar .siguiente { color: var(--accent-teal); }
+    .icono-hangar, .icono-logro { font-size: 1.6rem; width: 36px; text-align: center; flex: none; }
+    .tarjeta-hangar { flex-wrap: wrap; }
+    .tarjeta-hangar .datos-hangar { min-width: 180px; }
+    /* En el móvil, el botón de comprar pasa debajo y ocupa todo el ancho */
+    @media (max-width: 520px) {
+      .tarjeta-hangar > df-button { flex-basis: 100%; }
+    }
+    .logro:not(.conseguido) .icono-logro { filter: grayscale(1); opacity: 0.6; }
+    .logro.conseguido { border-color: rgba(61, 220, 151, 0.5); }
+    .logro .fecha { color: var(--accent-teal) !important; }
+    .barra-creditos { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: var(--text-muted); }
+    .barra-creditos strong { color: #ffd36b; font-size: 1.15rem; }
+
+    .lista-pinturas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .tarjeta-pintura {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      padding: 12px 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      text-align: center;
+    }
+    .tarjeta-pintura.activa { border-color: var(--accent-teal); box-shadow: 0 0 0 1px var(--accent-teal) inset; }
+    .miniatura { width: 46px; height: 52px; }
+
+    .rejilla-estadisticas { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .nota { font-size: 0.85rem; color: var(--text-muted); margin: 10px 0 0; }
+    .copia { display: grid; gap: 12px; }
+    .copia .fila-botones { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    #finLogros { padding-left: 0; list-style: none; display: grid; gap: 6px; margin: 6px 0 0; }
+    .tarjetas-fin { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    @media (max-width: 460px) { .tarjetas-fin { grid-template-columns: 1fr; } }
+
+    /* Accesibilidad: sin animaciones de la interfaz si el sistema lo pide */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ============ EL JUEGO (lo dibuja el motor) ============ -->
+  <canvas id="juego" aria-label="Nébula. Arrastra el dedo o usa las flechas para mover la nave; dispara sola."></canvas>
+
+  <!-- ============ CARGA ============ -->
+  <div id="carga" class="capa">
+    <div class="caja-carga">
+      <h1 class="titulo">NÉBULA</h1>
+      <p class="subtitulo">Cargando…</p>
+      <df-progress id="barraCarga" label="Construyendo la flota" show-value value="0"></df-progress>
+    </div>
+  </div>
+
+  <!-- ============ MENÚ PRINCIPAL ============ -->
+  <div id="menu" class="capa" hidden>
+    <div class="panel-menu">
+      <div>
+        <div class="cabecera-piloto">
+          <df-avatar id="avatarPiloto" name="Piloto" size="md" status="online"></df-avatar>
+          <div class="datos">
+            <strong id="nombrePiloto">Piloto</strong>
+            <span id="creditosPiloto">0 ⭐</span>
+          </div>
+          <df-button id="botonPilotos" variant="ghost" size="sm" shape="pill">Cambiar</df-button>
+        </div>
+        <h1 class="titulo">NÉBULA</h1>
+        <p class="subtitulo">Cruza los sectores y derriba a sus jefes</p>
+        <df-stat-card id="tarjetaRecord" label="Tu récord" value="0" unit="pts" format="number"></df-stat-card>
+      </div>
+      <div class="botones-menu">
+        <df-button id="botonJugar" variant="primary" size="lg" shape="pill" block>🚀 Despegar</df-button>
+        <div class="rejilla-menu">
+          <df-button id="botonHangar" variant="secondary" shape="pill" block>🛠️ Hangar</df-button>
+          <df-button id="botonLogros" variant="secondary" shape="pill" block>🏆 Logros <span id="contadorLogros">0/0</span></df-button>
+          <df-button id="botonEstadisticas" variant="secondary" shape="pill" block>📊 Estadísticas</df-button>
+          <df-button id="botonAjustes" variant="secondary" shape="pill" block>⚙️ Ajustes</df-button>
+        </div>
+        <div class="rejilla-menu">
+          <df-button id="botonAyuda" variant="ghost" shape="pill" size="sm" block>Cómo se juega</df-button>
+          <df-button id="botonPantallaCompleta" variant="ghost" shape="pill" size="sm" block>⛶ Pantalla completa</df-button>
+        </div>
+      </div>
+      <p class="creditos">Motor: <strong>DiegoFo Engine</strong> · Interfaz: <strong>diegofo-ui</strong> · Diego Fernández Ortega</p>
+    </div>
+  </div>
+
+  <!-- ============ MARCADOR (HUD) ============ -->
+  <div id="hud" hidden>
+    <div class="fila-hud">
+      <div class="marcadores" aria-live="off">
+        <df-badge id="marcadorPuntos" color="blue">0</df-badge>
+        <df-badge id="marcadorOleada" color="purple" variant="soft">Oleada 1</df-badge>
+        <df-badge id="marcadorArma" color="orange" variant="soft">🔫 1</df-badge>
+        <df-badge id="marcadorCombo" color="yellow" hidden>x2</df-badge>
+      </div>
+      <df-button id="botonPausa" variant="ghost" size="sm" shape="pill" aria-label="Pausa">❚❚</df-button>
+    </div>
+    <df-progress id="barraCasco" label="Casco" value="3" max="5" size="sm" variant="success"></df-progress>
+    <df-progress id="barraJefe" label="Jefe" value="100" max="100" size="md" variant="danger" hidden></df-progress>
+  </div>
+
+  <!-- ============ PAUSA ============ -->
+  <df-modal id="modalPausa" heading="Pausa" width="360px">
+    <p>La batalla está en pausa.</p>
+    <div slot="footer" class="pie-modal">
+      <df-button data-valor="menu" variant="ghost">Salir al menú</df-button>
+      <df-button data-valor="seguir" variant="primary">Seguir</df-button>
+    </div>
+  </df-modal>
+
+  <!-- ============ FIN DE LA PARTIDA ============ -->
+  <df-modal id="modalFin" heading="Nave destruida" persistent width="560px">
+    <div class="tarjetas-fin">
+      <df-stat-card id="finPuntos" label="Puntos" value="0" format="number"></df-stat-card>
+      <df-stat-card id="finOleada" label="Oleada" value="0" format="number" variant="info"></df-stat-card>
+      <df-stat-card id="finCreditos" label="Créditos ganados" value="0" unit="⭐" format="number" variant="warning"></df-stat-card>
+    </div>
+    <div id="finBloqueLogros" hidden>
+      <p class="nota">Logros desbloqueados:</p>
+      <ul id="finLogros"></ul>
+    </div>
+    <div slot="footer" class="pie-modal">
+      <df-button data-valor="menu" variant="ghost">Menú</df-button>
+      <df-button data-valor="hangar" variant="secondary">🛠️ Hangar</df-button>
+      <df-button data-valor="otra" variant="primary">↻ Otra vez</df-button>
+    </div>
+  </df-modal>
+
+  <!-- ============ PILOTOS ============ -->
+  <df-modal id="modalPilotos" heading="Pilotos" hide-cancel confirm-text="Cerrar" width="520px">
+    <p class="nota" style="margin-top:0">Cada piloto guarda sus créditos, mejoras, logros y estadísticas en este dispositivo.</p>
+    <ul id="listaPilotos" class="lista"></ul>
+    <df-button id="botonNuevoPiloto" variant="secondary" shape="pill" block style="margin-top:12px">＋ Nuevo piloto</df-button>
+  </df-modal>
+
+  <!-- ============ HANGAR ============ -->
+  <df-modal id="modalHangar" heading="Hangar" hide-cancel confirm-text="Volver" width="620px">
+    <div class="barra-creditos">Créditos disponibles <strong id="creditosHangar">0 ⭐</strong></div>
+    <df-tabs>
+      <df-tab-panel label="Mejoras">
+        <ul id="listaMejoras" class="lista"></ul>
+      </df-tab-panel>
+      <df-tab-panel label="Pinturas">
+        <ul id="listaPinturas" class="lista-pinturas"></ul>
+      </df-tab-panel>
+    </df-tabs>
+    <p class="nota">Los créditos se ganan jugando (1 por cada 20 puntos, +250 por cada Acorazado) y con los logros.</p>
+  </df-modal>
+
+  <!-- ============ LOGROS ============ -->
+  <df-modal id="modalLogros" heading="Logros" hide-cancel confirm-text="Cerrar" width="580px">
+    <df-progress id="resumenLogros" label="Logros" value="0" max="1" variant="success" show-value></df-progress>
+    <ul id="listaLogros" class="lista" style="margin-top:12px"></ul>
+  </df-modal>
+
+  <!-- ============ ESTADÍSTICAS ============ -->
+  <df-modal id="modalEstadisticas" heading="Estadísticas" hide-cancel confirm-text="Cerrar" width="680px">
+    <df-tabs>
+      <df-tab-panel label="Resumen">
+        <div id="rejillaEstadisticas" class="rejilla-estadisticas"></div>
+        <p id="tiempoJugado" class="nota"></p>
+      </df-tab-panel>
+      <df-tab-panel label="Historial">
+        <df-data-table id="tablaHistorial" caption="Últimas partidas" page-size="6" striped sort-key="fecha" sort-dir="desc"
+                       empty-text="Todavía no has jugado ninguna partida"></df-data-table>
+      </df-tab-panel>
+      <df-tab-panel label="Copia de seguridad">
+        <div class="copia">
+          <p class="nota" style="margin:0">El progreso se guarda en este dispositivo. Descarga una copia para no perderlo o para pasarlo a otro móvil u ordenador.</p>
+          <div class="fila-botones">
+            <df-button id="botonExportar" variant="primary" shape="pill" block>⬇ Exportar progreso</df-button>
+            <df-button id="botonImportar" variant="secondary" shape="pill" block>⬆ Importar progreso</df-button>
+          </div>
+          <input id="archivoImportar" type="file" accept=".json,application/json" hidden>
+        </div>
+      </df-tab-panel>
+    </df-tabs>
+  </df-modal>
+
+  <!-- ============ AJUSTES ============ -->
+  <df-modal id="modalAjustes" heading="Ajustes" hide-cancel confirm-text="Listo" width="400px">
+    <div class="ajustes">
+      <df-switch id="ajusteSonido" label="Efectos de sonido"></df-switch>
+      <df-switch id="ajusteMusica" label="Música"></df-switch>
+      <df-switch id="ajusteVibracion" label="Vibración al recibir daño"></df-switch>
+      <df-select id="ajusteDificultad" label="Dificultad" hint="Se aplica en la siguiente partida">
+        <option value="tranquila">Tranquila</option>
+        <option value="normal">Normal</option>
+        <option value="dificil">Difícil</option>
+      </df-select>
+      <df-switch id="ajusteDepurador" label="Modo depuración (ver el árbol de la escena y las colisiones · F2)"></df-switch>
+    </div>
+  </df-modal>
+
+  <!-- ============ AYUDA ============ -->
+  <df-modal id="modalAyuda" heading="Cómo se juega" hide-cancel confirm-text="¡A volar!" width="480px">
+    <df-tabs class="ayuda">
+      <df-tab-panel label="Objetivo">
+        <p>Una flota invade la nebulosa. Tu nave dispara sola: tú solo tienes que moverla.</p>
+        <ul>
+          <li>Esquiva las balas rosas y no choques con las naves.</li>
+          <li>Cada 5 oleadas llega un <strong>jefe</strong> con tres fases de ataque: el <strong>Acorazado</strong>, el <strong>Enjambre</strong> (rompe primero las placas de su escudo) y el <strong>Leviatán</strong> (apunta a la cabeza).</li>
+          <li>Después de cada jefe entras en un <strong>sector</strong> nuevo de la galaxia.</li>
+          <li>Tu casco aguanta varios golpes. Cada golpe te baja un nivel de arma.</li>
+        </ul>
+      </df-tab-panel>
+      <df-tab-panel label="Mejoras">
+        <ul>
+          <li><strong style="color:#ff9f43">P</strong>: sube el arma (hasta 5 disparos a la vez).</li>
+          <li><strong style="color:#5ce1ff">S</strong>: escudo que aguanta un golpe (10 s).</li>
+          <li><strong style="color:#ff5ca8">+</strong>: repara un punto del casco.</li>
+        </ul>
+      </df-tab-panel>
+      <df-tab-panel label="Progreso">
+        <ul>
+          <li>Cada partida te da <strong>créditos ⭐</strong>. Los derribos seguidos suben el <strong>combo</strong> (hasta x5) y multiplican los puntos.</li>
+          <li>En el <strong>Hangar</strong> compras mejoras permanentes y pinturas para tu nave.</li>
+          <li>Completa <strong>logros</strong> para ganar créditos extra.</li>
+          <li>Puedes tener varios <strong>pilotos</strong> y exportar tu progreso a un archivo.</li>
+        </ul>
+      </df-tab-panel>
+      <df-tab-panel label="Controles">
+        <ul>
+          <li><strong>Móvil:</strong> arrastra el dedo por cualquier parte de la pantalla. La nave se mueve lo mismo que el dedo, así no la tapas.</li>
+          <li><strong>Teclado:</strong> <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> o <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>P</kbd> o <kbd>Esc</kbd> pausa · <kbd>F2</kbd> depurador.</li>
+          <li>Si cambias de app o bloqueas el móvil, el juego se pausa solo.</li>
+        </ul>
+      </df-tab-panel>
+      <df-tab-panel label="Créditos">
+        <p>Juego, motor <strong>DiegoFo Engine</strong> y librería de componentes <strong>diegofo-ui</strong> por Diego Fernández Ortega.</p>
+        <p>Todo el arte y los sonidos se generan con código.</p>
+        <p><a href="ejemplos/escena-3d.html">Ver el ejemplo 3D del motor →</a></p>
+      </df-tab-panel>
+    </df-tabs>
+  </df-modal>
+
+  <df-toast-stack position="top-center" duration="2200" max="3"></df-toast-stack>
+
+  <!-- ============ SCRIPTS ============ -->
+  <!-- Librería de componentes (RA3 de Desarrollo de Interfaces) -->
+  <script src="lib/diegofo-ui.min.js"></script>
+
+  <!-- Motor: DiegoFo Engine (el orden importa: cada módulo usa los anteriores) -->
+  <script src="motor/nucleo.js"></script>
+  <script src="motor/pantalla.js"></script>
+  <script src="motor/nodo.js"></script>
+  <script src="motor/entrada.js"></script>
+  <script src="motor/fisica.js"></script>
+  <script src="motor/audio.js"></script>
+  <script src="motor/recursos.js"></script>
+  <script src="motor/particulas.js"></script>
+  <script src="motor/guardado.js"></script>
+  <script src="motor/depurador.js"></script>
+  <script src="motor/ui.js"></script>
+  <script src="motor/motor.js"></script>
+
+  <!-- El juego -->
+  <script src="juego/progreso.js"></script>
+  <script src="juego/arte.js"></script>
+  <script src="juego/entidades.js"></script>
+  <script src="juego/escena-batalla.js"></script>
+  <script src="juego/main.js"></script>
+</body>
+</html>

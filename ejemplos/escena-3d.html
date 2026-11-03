@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escena 3D · DiegoFo Engine</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b1026; color: #eef1ff; overflow: hidden;
+                 font-family: "Trebuchet MS", system-ui, sans-serif; }
+    #lienzo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .info { position: fixed; left: 12px; bottom: 12px; right: 12px; max-width: 520px;
+            padding: 10px 14px; background: rgba(0,0,0,0.6); border-radius: 10px; font-size: 0.85rem; line-height: 1.45; }
+    .info code { color: #ffd43b; }
+    a { color: #74c0fc; }
+  </style>
+</head>
+<body>
+  <canvas id="lienzo" aria-label="Cubo 3D. Arrastra para girar la cámara."></canvas>
+  <div class="info">
+    <strong>Arquitectura 3D en miniatura.</strong> Arrastra con el ratón o el dedo para girar la cámara.
+    Cada vértice pasa por: <code>modelo → mundo → cámara → proyección → pantalla</code>.
+    Las caras se ordenan por profundidad (algoritmo del pintor) y se iluminan según su ángulo con la luz.
+    <a href="../index.html">← Volver al juego</a>
+  </div>
+
+  <script src="../motor/nucleo.js"></script>
+  <script src="../motor/pantalla.js"></script>
+  <script src="../motor/nodo.js"></script>
+  <script src="../motor/entrada.js"></script>
+  <script src="../motor/fisica.js"></script>
+  <script src="../motor/audio.js"></script>
+  <script src="../motor/recursos.js"></script>
+  <script src="../motor/guardado.js"></script>
+  <script src="../motor/depurador.js"></script>
+  <script src="../motor/motor.js"></script>
+  <script>
+    /* =================================================================
+       Ejemplo 3D con el mismo motor
+       -----------------------------------------------------------------
+       El motor es 2D (canvas), pero aquí se hace a mano lo que hace la
+       GPU en un motor 3D (Unity, Godot, Unreal), para ver los pasos:
+
+       1. MODELO:   vértices del cubo alrededor de su propio centro
+       2. MUNDO:    se gira y se coloca en la escena (matriz de modelo)
+       3. CÁMARA:   se expresa respecto a la cámara (matriz de vista)
+       4. PROYECCIÓN EN PERSPECTIVA: lo lejano se ve más pequeño (x/z, y/z)
+       5. PANTALLA: se pasa a píxeles del canvas
+       ================================================================= */
+
+    /* ---------- Pequeña librería de vectores 3D ---------- */
+    const v = {
+      resta: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      punto: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cruz: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      normal: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+    };
+    function rotarY(p, a) { const c = Math.cos(a), s = Math.sin(a); return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c]; }
+    function rotarX(p, a) { const c = Math.cos(a), s = Math.sin(a); return [p[0], p[1] * c - p[2] * s, p[1] * s + p[2] * c]; }
+
+    /* ---------- Malla: un cubo (8 vértices, 6 caras) ---------- */
+    const CUBO = {
+      vertices: [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]],
+      caras: [ // índices de vértices (en sentido antihorario visto desde fuera) + color
+        { i: [0, 3, 2, 1], color: [240, 140, 58] },
+        { i: [4, 5, 6, 7], color: [245, 143, 181] },
+        { i: [0, 1, 5, 4], color: [116, 192, 252] },
+        { i: [3, 7, 6, 2], color: [61, 220, 151] },
+        { i: [1, 2, 6, 5], color: [255, 212, 59] },
+        { i: [0, 4, 7, 3], color: [177, 151, 252] },
+      ],
+    };
+    const LUZ = v.normal([0.4, 0.9, -0.5]);  // dirección hacia la luz (arriba)
+
+    /* ---------- Nodo del motor que dibuja la escena 3D ---------- */
+    class Mundo3D extends DFE.Nodo {
+      constructor() {
+        super({ nombre: "Mundo3D", parallax: 0 });
+        this.giro = 0;              // giro del cubo (matriz de modelo)
+        this.camYaw = 0.6;          // cámara orbital: ángulo horizontal
+        this.camPitch = 0.45;       //                 ángulo vertical
+        this.distancia = 6;
+        this.fov = 60 * Math.PI / 180;
+        this.anterior = null;
+      }
+
+      actualizar(dt) {
+        this.giro += dt * 0.6;
+        // Arrastrar para orbitar (ratón o dedo)
+        const p = this.escena.motor.entrada.puntero;
+        if (p.pulsado) {
+          if (this.anterior) {
+            this.camYaw -= (p.x - this.anterior.x) * 0.01;
+            this.camPitch = DFE.util.limitar(this.camPitch + (p.y - this.anterior.y) * 0.01, -1.3, 1.3);
+          }
+          this.anterior = { x: p.x, y: p.y };
+        } else this.anterior = null;
+      }
+
+      // 2 → 3: de MUNDO a CÁMARA
+      aCamara(p) {
+        // Posición de la cámara en órbita alrededor del origen
+        const cam = rotarY(rotarX([0, 0, -this.distancia], this.camPitch), this.camYaw);
+        // Deshacemos el giro de la cámara (matriz de vista = inversa)
+        let q = v.resta(p, cam);
+        q = rotarY(q, -this.camYaw);
+        q = rotarX(q, -this.camPitch);
+        return q;
+      }
+
+      // 4 → 5: PROYECCIÓN en perspectiva y paso a PANTALLA
+      aPantalla(q, w, h) {
+        const f = (h / 2) / Math.tan(this.fov / 2); // distancia focal
+        // Sistema diestro: mirando hacia +z con y arriba, la x queda a la izquierda
+        return { x: w / 2 - (q[0] * f) / q[2], y: h / 2 - (q[1] * f) / q[2], z: q[2] };
+      }
+
+      dibujar(ctx) {
+        const pant = this.escena.motor.pantalla;
+        const w = pant.anchoVisible, h = pant.altoVisible;
+
+        // Suelo: una cuadrícula en y = -1.6
+        ctx.strokeStyle = "rgba(116,192,252,0.25)";
+        ctx.lineWidth = 1;
+        for (let i = -5; i <= 5; i++) {
+          for (const [a, b] of [[[i, -1.6, -5], [i, -1.6, 5]], [[-5, -1.6, i], [5, -1.6, i]]]) {
+            const qa = this.aCamara(a), qb = this.aCamara(b);
+            if (qa[2] < 0.1 || qb[2] < 0.1) continue;  // detrás de la cámara
+            const pa = this.aPantalla(qa, w, h), pb = this.aPantalla(qb, w, h);
+            ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+          }
+        }
+
+        // Ejes del mundo (X rojo, Y verde, Z azul)
+        const origen = this.aPantalla(this.aCamara([0, -1.6, 0]), w, h);
+        [[[2.2, -1.6, 0], "#ff6b6b", "X"], [[0, 0.6, 0], "#69db7c", "Y"], [[0, -1.6, 2.2], "#4dabf7", "Z"]].forEach(([p, col, t]) => {
+          const e = this.aPantalla(this.aCamara(p), w, h);
+          ctx.strokeStyle = col; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(origen.x, origen.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+          ctx.fillStyle = col; ctx.font = "bold 12px system-ui"; ctx.fillText(t, e.x + 4, e.y - 4);
+        });
+
+        // 1 → 2: MODELO a MUNDO (giramos el cubo)
+        const mundo = CUBO.vertices.map((p) => rotarX(rotarY(p, this.giro), this.giro * 0.4));
+        const camara = mundo.map((p) => this.aCamara(p));
+        const pantalla = camara.map((q) => this.aPantalla(q, w, h));
+
+        // Caras: descartamos las de espaldas y ordenamos de lejos a cerca
+        const visibles = [];
+        for (const cara of CUBO.caras) {
+          const [a, b, c] = cara.i.map((k) => camara[k]);
+          const n = v.normal(v.cruz(v.resta(b, a), v.resta(c, a)));
+          if (v.punto(n, a) >= 0) continue;                 // mira hacia atrás (cara oculta)
+          const nMundo = v.normal(v.cruz(v.resta(mundo[cara.i[1]], mundo[cara.i[0]]), v.resta(mundo[cara.i[2]], mundo[cara.i[0]])));
+          const luz = 0.35 + 0.65 * Math.max(0, v.punto(nMundo, LUZ));  // iluminación difusa (Lambert)
+          const prof = cara.i.reduce((s, k) => s + camara[k][2], 0) / 4;
+          visibles.push({ cara, luz, prof });
+        }
+        visibles.sort((x, y) => y.prof - x.prof);           // algoritmo del pintor
+
+        for (const { cara, luz } of visibles) {
+          ctx.beginPath();
+          cara.i.forEach((k, j) => j ? ctx.lineTo(pantalla[k].x, pantalla[k].y) : ctx.moveTo(pantalla[k].x, pantalla[k].y));
+          ctx.closePath();
+          const [r, g, b] = cara.color.map((c) => Math.round(c * luz));
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.35)";
+          ctx.stroke();
+        }
+
+        // Un vértice, seguido por todas las transformaciones
+        // Seguimos el vértice más cercano a la cámara (siempre visible)
+        let k = 0;
+        camara.forEach((q, i) => { if (q[2] < camara[k][2]) k = i; });
+        const f = (n) => n.toFixed(2).padStart(6);
+        const lineas = [
+          `Vértice ${k} del cubo (el más cercano):`,
+          `modelo    (${CUBO.vertices[k].map(f).join(",")})`,
+          `mundo     (${mundo[k].map(f).join(",")})`,
+          `cámara    (${camara[k].map(f).join(",")})`,
+          `pantalla  (${f(pantalla[k].x)},${f(pantalla[k].y)})  prof ${f(camara[k][2])}`,
+        ];
+        ctx.fillStyle = "#ffd43b";
+        ctx.beginPath(); ctx.arc(pantalla[k].x, pantalla[k].y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.font = "11px ui-monospace, Consolas, monospace";
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(8, 8, 300, lineas.length * 14 + 8);
+        ctx.fillStyle = "#eef1ff";
+        lineas.forEach((l, i) => ctx.fillText(l, 14, 22 + i * 14));
+      }
+    }
+
+    const motor = new DFE.Motor({ canvas: "#lienzo", anchoMinimo: 420, altoMinimo: 360, nombre: "dfe-3d" });
+    const escena = new DFE.Escena({ nombre: "Escena3D", colorFondo: "#0b1026" });
+    escena.agregar(new Mundo3D());
+    motor.iniciar(escena);
+  </script>
+</body>
+</html>
