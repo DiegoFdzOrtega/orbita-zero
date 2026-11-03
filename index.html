@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <!-- viewport-fit=cover: usa toda la pantalla también en móviles con muesca -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Nébula: shooter espacial para móvil hecho con DiegoFo Engine (motor propio) y diegofo-ui.">
+  <meta name="description" content="Órbita Zero: shooter espacial para móvil hecho con DiegoFo Engine (motor propio) y diegofo-ui.">
   <meta name="theme-color" content="#050816">
   <!-- Se puede añadir a la pantalla de inicio como una app -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="iconos/icono-192.png">
   <link rel="apple-touch-icon" href="iconos/icono-192.png">
-  <title>Nébula · DiegoFo Engine</title>
+  <title>Órbita Zero · DiegoFo Engine</title>
 
   <style>
     /* ---------- Tema de diegofo-ui (los componentes leen estas variables) ---------- */
@@ -91,9 +91,9 @@
     }
     .titulo {
       margin: 0;
-      font-size: clamp(2.2rem, 10vw, 3rem);
+      font-size: clamp(1.8rem, 8.5vw, 2.6rem);
       line-height: 1;
-      letter-spacing: 6px;
+      letter-spacing: 4px;
       color: #fff;
       text-shadow: 0 0 12px rgba(92, 225, 255, 0.8), 0 0 32px rgba(255, 92, 168, 0.55);
     }
@@ -235,12 +235,12 @@
 
 <body>
   <!-- ============ EL JUEGO (lo dibuja el motor) ============ -->
-  <canvas id="juego" aria-label="Nébula. Arrastra el dedo o usa las flechas para mover la nave; dispara sola."></canvas>
+  <canvas id="juego" aria-label="Órbita Zero. Arrastra el dedo o usa las flechas para mover la nave; dispara sola."></canvas>
 
   <!-- ============ CARGA ============ -->
   <div id="carga" class="capa">
     <div class="caja-carga">
-      <h1 class="titulo">NÉBULA</h1>
+      <h1 class="titulo">ÓRBITA ZERO</h1>
       <p class="subtitulo">Cargando…</p>
       <df-progress id="barraCarga" label="Construyendo la flota" show-value value="0"></df-progress>
     </div>
@@ -258,7 +258,7 @@
           </div>
           <df-button id="botonPilotos" variant="ghost" size="sm" shape="pill">Cambiar</df-button>
         </div>
-        <h1 class="titulo">NÉBULA</h1>
+        <h1 class="titulo">ÓRBITA ZERO</h1>
         <p class="subtitulo">Cruza los sectores y derriba a sus jefes</p>
         <df-stat-card id="tarjetaRecord" label="Tu récord" value="0" unit="pts" format="number"></df-stat-card>
       </div>

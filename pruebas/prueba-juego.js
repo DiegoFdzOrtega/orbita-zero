@@ -1,5 +1,5 @@
 /* =====================================================================
-   Prueba automática de Nébula
+   Prueba automática de Órbita Zero
    ---------------------------------------------------------------------
    Abre el juego en varios dispositivos emulados y comprueba que:
      - no hay errores de JavaScript
@@ -30,9 +30,9 @@ const PILOTO = { id: "prueba", nombre: "Prueba", creditos: 0 };
 async function contextoConPiloto(navegador, opciones) {
   const ctx = await navegador.newContext(opciones);
   await ctx.addInitScript((p) => {
-    if (!localStorage.getItem("nebula:pilotos")) {
-      localStorage.setItem("nebula:pilotos", JSON.stringify([p]));
-      localStorage.setItem("nebula:pilotoActivo", JSON.stringify(p.id));
+    if (!localStorage.getItem("orbita-zero:pilotos")) {
+      localStorage.setItem("orbita-zero:pilotos", JSON.stringify([p]));
+      localStorage.setItem("orbita-zero:pilotoActivo", JSON.stringify(p.id));
     }
   }, PILOTO);
   return ctx;
@@ -207,7 +207,7 @@ async function contextoConPiloto(navegador, opciones) {
   comprobar(restaurados === 1 && await pagina.evaluate(() => progreso.nivel("casco") === 1),
     "exportar e importar recupera el piloto con sus mejoras");
   const rechaza = await pagina.evaluate(() => { try { progreso.importar("{}"); return false; } catch (e) { return true; } });
-  comprobar(rechaza, "rechaza un archivo que no es una copia de Nébula");
+  comprobar(rechaza, "rechaza un archivo que no es una copia de Órbita Zero");
   await ctx.close();
 
   await navegador.close();

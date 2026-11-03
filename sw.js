@@ -1,5 +1,5 @@
 /* =====================================================================
-   Nébula · service worker
+   Órbita Zero · service worker
    ---------------------------------------------------------------------
    Guarda todos los archivos del juego en la caché del navegador la
    primera vez. Después el juego se abre al instante y funciona SIN
@@ -7,7 +7,7 @@
    ejemplo en GitHub Pages).
    Al cambiar archivos, sube la VERSION para que se renueve la caché.
    ===================================================================== */
-const VERSION = "nebula-v2";
+const VERSION = "orbita-zero-v3";
 const ARCHIVOS = [
   "./", "index.html", "manifest.webmanifest",
   "iconos/icono-192.png", "iconos/icono-512.png",

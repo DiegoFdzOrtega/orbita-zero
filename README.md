@@ -1,18 +1,20 @@
-# DiegoFo Engine · motor de juegos 2D para móvil
+# Órbita Zero
 
-**RA4 · 0489 Programación multimedia y dispositivos móviles**
-Autor: **Diego Fernández Ortega** · DAM
+**Shooter espacial vertical para móvil, hecho sobre mi propio motor de juegos 2D.**
+Sin dependencias, sin imágenes y sin audio: todo se genera con código.
 
-**DiegoFo Engine** es un motor de juegos 2D propio, escrito en JavaScript, pensado para móviles y sin dependencias. Con él he hecho **Nébula**, un *shoot 'em up* vertical completo:
+Autor: **Diego Fernández Ortega**
+
+**DiegoFo Engine** es un motor de juegos 2D propio, escrito en JavaScript, pensado para móviles y sin dependencias. Con él he hecho **Órbita Zero**, un *shoot 'em up* vertical completo:
 - **La partida:** tu nave dispara sola, tú la mueves arrastrando el dedo, resistes oleadas de enemigos y cada 5 oleadas te enfrentas a un **jefe** (Acorazado, Enjambre o Leviatán) con tres fases de ataque. Después de cada jefe entras en un **sector** nuevo de la galaxia.
 - **El progreso:** **pilotos**, **créditos**, un **hangar** con mejoras permanentes y pinturas, **16 logros**, **estadísticas con historial**, **copia de seguridad** y **música generada**.
 - **Como app:** se instala en el móvil y funciona sin conexión.
 
-Para integrarlo con **Desarrollo de Interfaces**, el juego se dibuja con el motor en un `<canvas>`, y toda la interfaz usa **diegofo-ui**, la librería de componentes que hice en el RA3 de Interfaces. Incluye menús, marcador, barras de vida, hangar, logros, tablas de estadísticas, formularios y avisos.
+El juego se dibuja con el motor en un `<canvas>`. Toda la interfaz usa **[diegofo-ui](https://github.com/DiegoFdzOrtega/diegofo-ui)**, mi librería de Web Components: menús, marcador, barras de vida, hangar, logros, tablas de estadísticas, formularios y avisos.
 
-<!-- REVISA: cuando lo publiques en GitHub Pages, pon aquí el enlace: [▶ Jugar online](https://diegofdzortega.github.io/NOMBRE-DEL-REPO/) -->
+<p align="center"><a href="https://diegofdzortega.github.io/orbita-zero/"><strong>▶ Jugar online</strong></a> · se puede instalar en el móvil como una app</p>
 
-<p align="center"><img src="capturas/demo.gif" alt="Nébula en un móvil" width="300"></p>
+<p align="center"><img src="capturas/demo.gif" alt="Órbita Zero en un móvil" width="300"></p>
 
 | Menú | Acorazado | Enjambre | Leviatán |
 |:---:|:---:|:---:|:---:|
@@ -105,7 +107,7 @@ RA4-Multimedia/
 │   ├── depurador.js         ← FPS, árbol de la escena y cajas de colisión
 │   ├── ui.js                ← puente con diegofo-ui
 │   └── motor.js             ← bucle de juego y gestión de escenas
-├── juego/                   ← Nébula (usa el motor)
+├── juego/                   ← Órbita Zero (usa el motor)
 │   ├── progreso.js          ← pilotos, créditos, hangar, logros, estadísticas, copia de seguridad
 │   ├── arte.js              ← todas las naves, balas y fondos dibujados con código
 │   ├── entidades.js         ← Nave, balas, Dron, Caza, Kamikaze, Fragata, Jefe, Mejora…
@@ -118,7 +120,7 @@ RA4-Multimedia/
 └── capturas/
 ```
 
-El **motor** (`motor/`) no sabe nada del juego, y el **juego** (`juego/`) solo usa lo que le ofrece el motor. La misma separación que hay entre Unity y un proyecto hecho con Unity. Antes de Nébula, el motor movía un juego de correr y saltar (*endless runner*) sin cambiar ni una línea del motor. Solo hubo que añadir dos propiedades a `Sprite`: `mezcla` (brillos) y `destello` (parpadeo al recibir daño).
+El **motor** (`motor/`) no sabe nada del juego, y el **juego** (`juego/`) solo usa lo que le ofrece el motor. La misma separación que hay entre Unity y un proyecto hecho con Unity. Antes de Órbita Zero, el motor movía un juego de correr y saltar (*endless runner*) sin cambiar ni una línea del motor. Solo hubo que añadir dos propiedades a `Sprite`: `mezcla` (brillos) y `destello` (parpadeo al recibir daño).
 
 ---
 
@@ -126,7 +128,7 @@ El **motor** (`motor/`) no sabe nada del juego, y el **juego** (`juego/`) solo u
 
 El canvas es muy rápido para dibujar 60 veces por segundo, pero no es accesible: un lector de pantalla no puede leer un botón dibujado en él. Por eso el juego se dibuja en el canvas y la interfaz se hace con componentes HTML de **diegofo-ui**, que ya tienen el foco, el teclado y los atributos ARIA resueltos. Los motores profesionales también separan el mundo del juego de la UI (Unity tiene *UI Toolkit* y Godot los nodos *Control*).
 
-Nébula usa **13 de los 15 componentes** de la librería:
+Órbita Zero usa **13 de los 15 componentes** de la librería:
 
 | Componente de diegofo-ui | Dónde se usa en el juego |
 |---|---|
@@ -192,7 +194,7 @@ Un juego de móvil tiene que dar motivos para volver. Todo esto vive en `juego/p
 
 ### ¿Por qué no hay login con usuario y contraseña?
 
-Un login de verdad necesita un **servidor** que guarde las cuentas. Nébula es una **web estática**: se abre con doble clic, se publica gratis en GitHub Pages y funciona **sin conexión**. Por eso el progreso se guarda **en el dispositivo** (`localStorage`), con perfiles locales y copia de seguridad para llevarlo a otro móvil, como hacen muchos juegos móviles que no tienen cuentas.
+Un login de verdad necesita un **servidor** que guarde las cuentas. Órbita Zero es una **web estática**: se abre con doble clic, se publica gratis en GitHub Pages y funciona **sin conexión**. Por eso el progreso se guarda **en el dispositivo** (`localStorage`), con perfiles locales y copia de seguridad para llevarlo a otro móvil, como hacen muchos juegos móviles que no tienen cuentas.
 
 Cómo se ampliaría a la nube, sin cambiar la interfaz, porque `Progreso` ya separa la lógica del almacenamiento:
 - **API propia en PHP + MySQL** (como mi ERP Crimson): `POST /login`, `GET/PUT /progreso`. `Progreso.guardar()` enviaría el JSON que hoy produce `exportar()`.
@@ -205,7 +207,7 @@ Cómo se ampliaría a la nube, sin cambiar la interfaz, porque `Progreso` ya sep
 
 ### Música generada con código
 
-El motor incluye un **secuenciador** (`audio.reproducirMusica`). Una canción es una lista de pistas con notas MIDI por semicorchea, y las notas se programan por adelantado con el reloj de la Web Audio API, que es mucho más preciso que `setTimeout`. Nébula tiene tres temas, todos con la progresión *La m – Fa – Do – Sol*:
+El motor incluye un **secuenciador** (`audio.reproducirMusica`). Una canción es una lista de pistas con notas MIDI por semicorchea, y las notas se programan por adelantado con el reloj de la Web Audio API, que es mucho más preciso que `setTimeout`. Órbita Zero tiene tres temas, todos con la progresión *La m – Fa – Do – Sol*:
 - **Menú:** tranquilo, a 84 BPM.
 - **Batalla:** bombo, bajo y arpegio, a 116 BPM.
 - **Jefe:** la de batalla, más rápida (132 BPM).
@@ -229,7 +231,7 @@ flowchart TB
 
 ### Elementos comunes
 
-| Elemento | Qué es | En Nébula |
+| Elemento | Qué es | En Órbita Zero |
 |---|---|---|
 | **Bucle de juego** | Repite sin parar: leer entrada → actualizar → dibujar | `Motor._bucle` |
 | **Escena / nivel** | Todo lo que existe en un momento del juego | `EscenaBatalla` (y la del menú) |
@@ -384,7 +386,7 @@ Un **entorno de desarrollo de juegos** junta el editor visual, el editor de cód
 ### Juego analizado: *Dodge the Creeps* (Godot)
 
 *Dodge the Creeps* es el juego del tutorial oficial **"Tu primer juego 2D"** de Godot, y su proyecto está publicado entre las demos oficiales del motor. Lo elegí por tres motivos:
-- Es un juego **vertical** de **esquivar enemigos**, como Nébula.
+- Es un juego **vertical** de **esquivar enemigos**, como Órbita Zero.
 - Está hecho con un **motor profesional**, así que se ve cómo organiza Godot un juego en **escenas y nodos**.
 - Su código es **abierto**, así que el análisis se puede comprobar.
 
@@ -397,9 +399,9 @@ El juego se divide en varias **escenas** reutilizables, y cada una es un árbol 
 | **Mob** (`RigidBody2D`) | `AnimatedSprite2D`, `CollisionShape2D`, `VisibleOnScreenNotifier2D` | **Enemigo**: lo mueve la física y se borra al salir de la pantalla |
 | **HUD** (`CanvasLayer`) | `ScoreLabel`, `Message`, `StartButton`, `MessageTimer` | **Interfaz**: puntuación, mensajes y botón de empezar |
 
-Comparación de bloques funcionales con Nébula:
+Comparación de bloques funcionales con Órbita Zero:
 
-| Bloque | *Dodge the Creeps* (Godot) | Nébula (DiegoFo Engine) |
+| Bloque | *Dodge the Creeps* (Godot) | Órbita Zero (DiegoFo Engine) |
 |---|---|---|
 | **Bucle y tiempo** | Lo pone el motor (`_process`, `_physics_process`) | Lo pone el motor (`actualizar(dt)` a paso fijo) |
 | **Aparición de enemigos** | `MobTimer` + un punto al azar de un **camino** (`Path2D`) alrededor de la pantalla | Una **cola de oleadas** con formaciones (`construirOleada`) |
@@ -427,7 +429,7 @@ flowchart TB
 
 **Conclusión:** los dos juegos tienen los mismos bloques (control, jugador, enemigos, colisiones, interfaz, audio) y los organizan igual, como un **árbol de nodos que se comunican por mensajes**. La diferencia es que en Godot muchos bloques son **nodos ya hechos** que se configuran en el editor (temporizadores, caminos, notificadores de pantalla), mientras que en DiegoFo Engine se programan.
 
-### Bloques funcionales de Nébula
+### Bloques funcionales de Órbita Zero
 
 ```mermaid
 flowchart LR
@@ -451,7 +453,7 @@ Una escena se puede describir de dos formas:
 - **Lógica:** qué objetos hay y cómo se organizan (el árbol: quién contiene a quién).
 - **Espacial:** dónde está cada objeto: coordenadas, capa, tamaño, caja de colisión y cómo se ve a través de la cámara.
 
-### Representación lógica: el grafo de escena de Nébula
+### Representación lógica: el grafo de escena de Órbita Zero
 
 ```mermaid
 flowchart TB
@@ -552,7 +554,7 @@ Hay **34 comprobaciones automáticas** con Playwright (`pruebas/prueba-juego.js`
 | Recargar la página | ✅ Se conservan el récord y el progreso |
 | Comprar «Casco reforzado» en el hangar | ✅ La siguiente partida empieza con 4 de casco |
 | Exportar, borrar el piloto e importar | ✅ Se recupera con sus mejoras |
-| Importar un archivo que no es una copia de Nébula | ✅ Se rechaza |
+| Importar un archivo que no es una copia de Órbita Zero | ✅ Se rechaza |
 
 Además, probado a mano: pausa con `Esc` y con el botón, pinturas, logros, estadísticas, historial, ajustes, ayuda y la escena 3D.
 
@@ -601,6 +603,8 @@ npm test
 ---
 
 ## Créditos
+
+- Proyecto desarrollado en el ciclo **DAM**, módulos *Programación multimedia y dispositivos móviles* (análisis de motores de juegos, criterios a–f de este documento) y *Desarrollo de Interfaces* (librería diegofo-ui).
 
 - **Motor, juego y librería diegofo-ui:** Diego Fernández Ortega.
 - Todo el arte y el sonido se generan con código: no hay imágenes ni audios de terceros.
