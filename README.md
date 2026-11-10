@@ -146,6 +146,11 @@ El canvas es muy rápido para dibujar 60 veces por segundo, pero no es accesible
 | `<df-select>` | Dificultad (Tranquila, Normal, Difícil) |
 | `<df-toast-stack>` | Aviso del jefe, oleadas, mejoras, compras y logros desbloqueados |
 
+| Menú principal | Fin de partida |
+|:---:|:---:|
+| ![Menú](capturas/menu.png) | ![Fin de partida](capturas/fin.png) |
+| `df-avatar` (piloto), `df-stat-card` (récord), `df-button` y un aviso de logro en `df-toast-stack` | `df-modal` con tres `df-stat-card` y la recompensa del logro en un `df-badge` |
+
 **Tema:** los componentes leen variables CSS (`--bg-card`, `--text-main`, `--df-color-primary`…). Redefiniéndolas en `index.html`, toda la librería pasa a un tema espacial cian y rosa sin tocar su código.
 
 **Puente motor ↔ interfaz** (`motor/ui.js` y `juego/main.js`):
@@ -353,8 +358,6 @@ Un **entorno de desarrollo de juegos** junta el editor visual, el editor de cód
 | **Playwright** | Pruebas automáticas (`pruebas/`): un "bot" que juega solo en varios móviles emulados |
 | **Git + GitHub** | Control de versiones |
 
-<!-- REVISA: ajusta esta tabla si usaste otras herramientas. -->
-
 ---
 
 ## d) Comparativa de motores de juegos
@@ -453,7 +456,76 @@ Una escena se puede describir de dos formas:
 - **Lógica:** qué objetos hay y cómo se organizan (el árbol: quién contiene a quién).
 - **Espacial:** dónde está cada objeto: coordenadas, capa, tamaño, caja de colisión y cómo se ve a través de la cámara.
 
-### Representación lógica: el grafo de escena de Órbita Zero
+Primero lo analizo sobre el juego existente del apartado e), *Dodge the Creeps* (Godot), y después sobre Órbita Zero.
+
+### En un juego existente: *Dodge the Creeps* (Godot)
+
+#### Representación lógica
+
+La escena principal (`Main`) es un árbol de nodos. Algunos nodos son **escenas guardadas aparte** (`Player`, `HUD`) que se **instancian** dentro de `Main`, y los enemigos (`Mob`) no están en el árbol al empezar: se instancian por código mientras se juega.
+
+```mermaid
+flowchart TB
+  M["Main · Node<br/>(sin posición propia)"]
+  M --> BG["ColorRect · fondo<br/>ocupa toda la ventana"]
+  M --> P["Player · Area2D<br/>escena instanciada"]
+  P --> PS["AnimatedSprite2D<br/>animaciones walk / up"]
+  P --> PC["CollisionShape2D<br/>cápsula"]
+  M --> SP["StartPosition · Marker2D<br/>(240, 450)"]
+  M --> PA["MobPath · Path2D<br/>rectángulo del borde"]
+  PA --> SL["MobSpawnLocation · PathFollow2D"]
+  M --> T["MobTimer · ScoreTimer · StartTimer<br/>(Timer: no se ven ni tienen posición)"]
+  M --> H["HUD · CanvasLayer<br/>escena instanciada"]
+  H --> HL["ScoreLabel · Message · StartButton"]
+  M --> A["Music · DeathSound<br/>(AudioStreamPlayer)"]
+  M -. "add_child() cada 0,5 s" .-> MO["Mob · RigidBody2D<br/>AnimatedSprite2D + CollisionShape2D<br/>+ VisibleOnScreenNotifier2D"]
+```
+
+- **No todo nodo es visible ni tiene posición.** Los `Timer`, los `AudioStreamPlayer` y el propio `Main` (un `Node` básico) existen en el árbol lógico pero no ocupan ningún sitio en la pantalla. Solo los nodos que heredan de `Node2D` tienen coordenadas.
+- **El tipo del nodo dice cómo participa en la física:** el `Player` es un `Area2D` (detecta choques pero no lo empuja nada) y el `Mob` es un `RigidBody2D` (lo mueve el motor de física con la velocidad que se le da al crearlo).
+- **El orden en el árbol es el orden de dibujo:** el `ColorRect` va primero, así que queda al fondo.
+
+#### Representación espacial
+
+```
+(0,0) ──────────── MobPath ──────────── (480,0)
+  │  ↓ los Mob aparecen en un punto al     │
+  │    azar del borde y entran hacia       │
+  │    dentro (±45° de la perpendicular)   │
+  │                                        │
+  │              Player                    │
+  │            (240, 450)                  │
+  │                                        │
+(0,720) ────────────────────────────── (480,720)
+```
+
+| Aspecto | Cómo es en *Dodge the Creeps* |
+|---|---|
+| **Sistema de coordenadas** | Píxeles de la ventana del proyecto, de **480 × 720** (vertical, como un móvil). Origen arriba a la izquierda y la *y* crece hacia abajo, igual que en Órbita Zero |
+| **Cámara** | **No hay `Camera2D`**: el mundo y la pantalla coinciden, todo el juego cabe en la ventana. Al cambiar el tamaño de la ventana, Godot **escala** la imagen (modo *stretch*) en vez de enseñar más mundo |
+| **Límites** | El jugador calcula el tamaño de la pantalla con `get_viewport_rect().size` y **recorta** su posición con `clamp()` para no salirse |
+| **Aparición de enemigos** | El `Path2D` es un rectángulo que recorre las cuatro esquinas de la pantalla. `PathFollow2D` coge un punto al azar del recorrido (`progress_ratio = randf()`), y su **rotación** (la dirección del borde en ese punto) más 90° da la dirección hacia dentro, con ±45° de variación |
+| **Movimiento** | El `Player` se mueve unos 400 px/s. Cada `Mob` sale con una velocidad al azar (de 150 a 250 px/s) girada hacia esa dirección, y su sprite se gira para mirar hacia donde va |
+| **Colisiones** | Las formas son **cápsulas** (`CollisionShape2D`), más ajustadas al dibujo que un rectángulo. Al chocar, el `Area2D` del jugador emite la señal `body_entered` |
+| **Salir de la pantalla** | El `VisibleOnScreenNotifier2D` del `Mob` tiene un rectángulo propio y avisa con `screen_exited` cuando deja de verse, y entonces el enemigo se borra con `queue_free()` |
+| **Capas** | El `HUD` es un `CanvasLayer`: se dibuja en **su propia capa, encima del juego** y con sus propias coordenadas. Aunque hubiera cámara, el marcador no se movería con ella |
+
+#### Comparación con Órbita Zero
+
+| | *Dodge the Creeps* | Órbita Zero |
+|---|---|---|
+| Tamaño lógico | 480 × 720, fijo; se escala | Campo de 360 de ancho; en pantallas anchas se ve más espacio alrededor |
+| Cámara | No tiene | `Camara` que centra el campo y tiembla con las explosiones |
+| Profundidad | Orden de los nodos en el árbol | Capas `z` en cada grupo + parallax del fondo |
+| Formas de colisión | Cápsulas | Cajas AABB con margen |
+| Interfaz | `CanvasLayer` encima del juego | HTML de diegofo-ui encima del `<canvas>` |
+| Enemigos que salen | `VisibleOnScreenNotifier2D` → `queue_free()` | Comprobación de límites → `destruir()` |
+
+La idea es la misma en los dos: un **árbol lógico** que dice qué hay y quién depende de quién, y unas **coordenadas** que dicen dónde está cada cosa y qué parte se ve.
+
+### En Órbita Zero
+
+#### Representación lógica: el grafo de escena de Órbita Zero
 
 ```mermaid
 flowchart TB
@@ -478,7 +550,7 @@ flowchart TB
 - **El orden de los grupos es el orden de dibujo:** las balas enemigas (z 8) se dibujan **encima** de las naves para que siempre se vean. Es una decisión de jugabilidad: lo que te mata tiene que verse.
 - **Las etiquetas** (`"enemigo"`, `"balaEnemiga"`, `"mejora"`, `"jefe"`) dicen contra qué se comprueba cada choque.
 
-### Los jefes: jerarquías dentro del árbol
+#### Los jefes: jerarquías dentro del árbol
 
 Los dos jefes nuevos son el mejor ejemplo de por qué un motor usa un **grafo de escena**:
 
@@ -501,7 +573,7 @@ flowchart TB
 - **Comunicación hijo → padre:** cuando un segmento recibe daño, avisa a su padre (`this.padre.recibirDano`), así que la barra de vida del Leviatán baja aunque dispares al cuerpo.
 - **El árbol cambia sin parar:** en cada oleada se crean y destruyen decenas de nodos. En las pruebas automáticas, durante las oleadas normales, el árbol se mantuvo en **unos 30–40 nodos**.
 
-### Representación espacial
+#### Representación espacial
 
 **Tres sistemas de coordenadas:**
 
@@ -518,7 +590,7 @@ flowchart TB
 
 **Cajas de colisión (AABB):** cada nodo tiene `ancho`, `alto`, un **ancla** (las naves tienen el origen en el centro, `{x: 0,5, y: 0,5}`) y un **margen** que encoge la caja. La nave del jugador se dibuja de 34 × 38 pero su caja es de solo **10 × 14**, como en los *bullet hell*: el juego perdona los roces y la sensación es justa.
 
-### Verlo en el juego: el depurador (F2)
+#### Verlo en el juego: el depurador (F2)
 
 El modo depuración dibuja las dos representaciones encima del juego:
 - **Lógica:** el árbol de la escena en vivo, con la posición global y la capa de cada nodo.
@@ -526,13 +598,13 @@ El modo depuración dibuja las dos representaciones encima del juego:
 
 ![Depurador: árbol de la escena y cajas de colisión](capturas/depurador.png)
 
-### La misma escena en distintos dispositivos
+#### La misma escena en distintos dispositivos
 
 La escena lógica es **idéntica** en todos los dispositivos. Lo que cambia es la espacial: el campo siempre mide 360 de ancho, pero cambia cuánto se ve alrededor y a qué escala.
 
-| Ordenador (1280×720) | Móvil en horizontal |
-|:---:|:---:|
-| ![Ordenador](capturas/juego.png) | ![Horizontal](capturas/movil-horizontal.png) |
+| Ordenador (1280×720) | Móvil en horizontal | Móvil en vertical |
+|:---:|:---:|:---:|
+| ![Ordenador](capturas/juego.png) | ![Horizontal](capturas/movil-horizontal.png) | <img src="capturas/movil-vertical.png" alt="Vertical" width="220"> |
 
 ---
 
@@ -608,5 +680,4 @@ npm test
 
 - **Motor, juego y librería diegofo-ui:** Diego Fernández Ortega.
 - Todo el arte y el sonido se generan con código: no hay imágenes ni audios de terceros.
-- **Claude** me ayudó a diseñar la arquitectura, escribir y explicar el código y redactar la documentación.
-- Análisis de *Dodge the Creeps* a partir del tutorial "Tu primer juego 2D" de la documentación oficial de Godot y su proyecto de demostración.
+- Análisis de *Dodge the Creeps* (apartados e y f) a partir del tutorial "Tu primer juego 2D" de la documentación oficial de Godot y su proyecto de demostración.

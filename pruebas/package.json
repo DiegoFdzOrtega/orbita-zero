@@ -1,7 +1,7 @@
 {
-  "name": "rosquilla-runner-pruebas",
+  "name": "orbita-zero-pruebas",
   "private": true,
-  "description": "Pruebas automáticas de Rosquilla Runner con Playwright",
+  "description": "Pruebas automáticas de Órbita Zero con Playwright",
   "scripts": {
     "test": "node prueba-juego.js"
   },
